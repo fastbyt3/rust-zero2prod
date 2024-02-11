@@ -8,11 +8,33 @@ pub struct SubscribeFormData {
     email: String,
 }
 
+#[tracing::instrument(
+    name = "Adding a new subscriber"
+    skip(form, db_pool),
+    fields(
+        subscriber_name = %form.name,
+        subscriber_email = %form.email,
+    )
+)]
 pub async fn post_subscribe(
     form: web::Form<SubscribeFormData>,
     db_pool: web::Data<PgPool>,
 ) -> HttpResponse {
-    let pg_query_result = sqlx::query!(
+    match insert_subscriber(&db_pool, &form).await {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(e) => {
+            tracing::error!("Error when running query: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
+}
+
+#[tracing::instrument(name = "Saving new subscriber details in DB", skip(db_pool, form))]
+pub async fn insert_subscriber(
+    db_pool: &PgPool,
+    form: &SubscribeFormData,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
 INSERT INTO subscriptions (id, email, name, subscribed_at)
 VALUES ($1, $2, $3, $4)
@@ -22,15 +44,12 @@ VALUES ($1, $2, $3, $4)
         form.name,
         Utc::now()
     )
-    // We use `get_ref` to get an immutable reference to the `PgConnection`
-    // wrapped by `web::Data`.
-    .execute(db_pool.get_ref())
-    .await;
-    match pg_query_result {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(e) => {
-            eprintln!("Error when running query: {e}");
-            HttpResponse::InternalServerError().finish()
-        }
-    }
+    .execute(db_pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to exec query: {:?}", e);
+        return e;
+    })?;
+
+    Ok(())
 }
