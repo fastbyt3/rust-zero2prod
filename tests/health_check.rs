@@ -1,7 +1,6 @@
 use std::net::TcpListener;
 
 use once_cell::sync::Lazy;
-use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use zero2prod::{
@@ -48,6 +47,40 @@ async fn subscriber_returns_200_for_valid_form_data() {
 
     assert_eq!(saved.email, "fast@byte.bit");
     assert_eq!(saved.name, "fastbyte bit");
+}
+
+#[tokio::test]
+async fn subscriber_returns_200_when_fields_are_present_but_empty() {
+    let test_app = spawn_app().await;
+
+    let client = reqwest::Client::new();
+
+    let scenarios = vec![
+        ("name=&email=test@mail.com", "name field is empty"),
+        ("name=test&email=", "email is empty"),
+        (
+            "name=test&email=test",
+            "email is present but invalid format",
+        ),
+    ];
+
+    let endpoint = &format!("{}/subscribe", test_app.address);
+
+    for (payload, description) in scenarios {
+        let resp = client
+            .post(endpoint)
+            .header("Content-Type", "x-www-form-urlencoded")
+            .body(payload)
+            .send()
+            .await
+            .expect("Failed to send POST reqwest");
+        assert_ne!(
+            resp.status().as_u16(),
+            200,
+            "API returned 200 when payload was: {}",
+            description
+        );
+    }
 }
 
 #[tokio::test]
@@ -118,14 +151,14 @@ async fn spawn_app() -> TestApp {
 }
 
 pub async fn configure_db(config: &DatabaseSettings) -> PgPool {
-    PgConnection::connect(&config.connection_string_without_dbname().expose_secret())
+    PgConnection::connect_with(&config.without_db())
         .await
         .expect("Failed to connect to Postgres")
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await
         .expect("Failed to create test DB");
 
-    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
+    let connection_pool = PgPool::connect_with(config.with_db())
         .await
         .expect("Failed to connect to test db");
 
