@@ -50,7 +50,7 @@ async fn subscriber_returns_200_for_valid_form_data() {
 }
 
 #[tokio::test]
-async fn subscriber_returns_200_when_fields_are_present_but_empty() {
+async fn subscriber_returns_400_when_fields_are_present_but_invalid() {
     let test_app = spawn_app().await;
 
     let client = reqwest::Client::new();
@@ -74,10 +74,11 @@ async fn subscriber_returns_200_when_fields_are_present_but_empty() {
             .send()
             .await
             .expect("Failed to send POST reqwest");
-        assert_ne!(
+        dbg!(resp.status());
+        assert_eq!(
             resp.status().as_u16(),
-            200,
-            "API returned 200 when payload was: {}",
+            400,
+            "API did not return 400 BAD REQUEST when payload was: {}",
             description
         );
     }
