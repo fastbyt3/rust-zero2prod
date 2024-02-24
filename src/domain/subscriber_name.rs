@@ -14,9 +14,9 @@ impl SubscriberName {
 
         if is_empty_or_whitespace || is_too_long || contains_forbidden_chars {
             dbg!("Recv name: {}", s.clone());
-            return Err(format!("{s} is not a valid subscriber name"));
+            Err(format!("{s} is not a valid subscriber name"))
         } else {
-            return Ok(Self(s));
+            Ok(Self(s))
         }
     }
 }
