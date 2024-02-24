@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  RUSTFLAGS: "-D warnings" 
+
+jobs:
+  fmt_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Update local toolchain
+        run: |
+          rustup update
+          rustup component add clippy
+          rustup install nightly          
+
+      - name: Toolchain info
+        run: |
+          cargo --version --verbose
+          rustc --version
+          cargo clippy --version          
+
+      - name: Lint
+        run: |
+          cargo fmt -- --check
+          cargo clippy -- -D warnings          
+
+      - name: Compile
+        run: cargo test --no-run --locked
+
+      - name: Test
+        run: cargo test
