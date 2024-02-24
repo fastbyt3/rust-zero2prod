@@ -19,7 +19,7 @@ where
         .with(env_filter)
         .with(JsonStorageLayer)
         .with(formatting_layer);
-    return subscriber;
+    subscriber
 }
 
 pub fn init_subscriber(subscriber: impl Subscriber + Sync + Send) {
