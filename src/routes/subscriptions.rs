@@ -68,7 +68,7 @@ VALUES ($1, $2, $3, $4)
     .await
     .map_err(|e| {
         tracing::error!("Failed to exec query: {:?}", e);
-        return e;
+        e
     })?;
 
     Ok(())

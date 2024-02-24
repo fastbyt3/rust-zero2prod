@@ -15,11 +15,10 @@ where
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = BunyanFormattingLayer::new(name, sink);
-    let subscriber = Registry::default()
+    Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)
-        .with(formatting_layer);
-    subscriber
+        .with(formatting_layer)
 }
 
 pub fn init_subscriber(subscriber: impl Subscriber + Sync + Send) {
