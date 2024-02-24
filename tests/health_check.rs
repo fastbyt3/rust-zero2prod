@@ -5,6 +5,7 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use zero2prod::{
     configuration::{get_config, DatabaseSettings},
+    email_client::EmailClient,
     startup::run,
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -143,7 +144,17 @@ async fn spawn_app() -> TestApp {
     config.database.database_name = Uuid::new_v4().to_string();
     let db_pool = configure_db(&config.database).await;
 
-    let server = run(listener, db_pool.clone()).expect("Failed to get server");
+    let sender_email = config
+        .email_client
+        .sender()
+        .expect("Failed to parse sender_email");
+    let email_client = EmailClient::new(
+        config.email_client.base_url,
+        sender_email,
+        config.email_client.authorization_token,
+    );
+
+    let server = run(listener, db_pool.clone(), email_client).expect("Failed to get server");
 
     let _ = tokio::spawn(server);
 
