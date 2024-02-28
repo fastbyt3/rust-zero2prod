@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::{net::TcpListener, time::Duration};
 
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -152,6 +152,7 @@ async fn spawn_app() -> TestApp {
         config.email_client.base_url,
         sender_email,
         config.email_client.authorization_token,
+        Duration::from_millis(500),
     );
 
     let server = run(listener, db_pool.clone(), email_client).expect("Failed to get server");
