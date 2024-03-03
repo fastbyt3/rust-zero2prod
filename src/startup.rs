@@ -7,7 +7,7 @@ use tracing_actix_web::TracingLogger;
 use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
-    routes::{get_health, post_subscribe},
+    routes::{get_health, post_subscribe, subscription_confirm},
 };
 
 pub struct Application {
@@ -37,7 +37,12 @@ impl Application {
 
         let listener = TcpListener::bind(server_address)?;
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool, email_client)?;
+        let server = run(
+            listener,
+            connection_pool,
+            email_client,
+            config.application.base_url,
+        )?;
 
         Ok(Self { port, server })
     }
@@ -51,6 +56,8 @@ impl Application {
     }
 }
 
+pub struct ApplicationBaseUrl(pub String);
+
 pub fn get_connection_pool(db_cfg: &DatabaseSettings) -> PgPool {
     PgPoolOptions::new().connect_lazy_with(db_cfg.with_db())
 }
@@ -59,16 +66,23 @@ pub fn run(
     listener: TcpListener,
     connection_pool: PgPool,
     email_client: EmailClient,
+    base_url: String,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(connection_pool);
     let email_client = web::Data::new(email_client);
+    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
             .route("/health", web::get().to(get_health))
             .route("/subscribe", web::post().to(post_subscribe))
+            .route(
+                "/subscriptions/confirm",
+                web::get().to(subscription_confirm),
+            )
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
+            .app_data(base_url.clone())
     })
     .listen(listener)?
     .run();

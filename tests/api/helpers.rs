@@ -12,6 +12,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub email_server: MockServer,
+    pub port: u16,
 }
 
 impl TestApp {
@@ -23,6 +24,32 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
+        let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+        let get_link = |s: &str| {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+
+            let raw_link = links[0].as_str().to_owned();
+            let mut link = reqwest::Url::parse(&raw_link).unwrap();
+            assert_eq!(link.host_str().unwrap(), "127.0.0.1");
+
+            link.set_port(Some(self.port)).unwrap();
+            link
+        };
+
+        let html_link = get_link(&body["Messages"][0]["HTMLPart"].as_str().unwrap());
+        let plain_text = get_link(&body["Messages"][0]["TextPart"].as_str().unwrap());
+
+        ConfirmationLinks {
+            html: html_link,
+            plain_text,
+        }
     }
 }
 
@@ -57,13 +84,15 @@ pub async fn spawn_app() -> TestApp {
     let application = Application::build(config.clone())
         .await
         .expect("Failed to build app");
-    let address = format!("http://127.0.0.1:{}", application.port());
+    let application_port = application.port();
+    let address = format!("http://127.0.0.1:{}", application_port);
     let _ = tokio::spawn(application.run_until_stopped());
 
     TestApp {
         address,
         db_pool: get_connection_pool(&config.database),
         email_server,
+        port: application_port,
     }
 }
 
@@ -85,4 +114,9 @@ async fn configure_db(config: &DatabaseSettings) -> PgPool {
         .expect("Failed to run migration on test DB");
 
     connection_pool
+}
+
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
 }
