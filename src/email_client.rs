@@ -54,7 +54,7 @@ impl EmailClient {
         };
 
         self.http_client
-            .post(&self.base_url)
+            .post(format!("{}/send", &self.base_url))
             .json(&req_body)
             .header(
                 "Authorization",
