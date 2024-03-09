@@ -36,7 +36,7 @@ async fn post_subscribe_persists_data_on_success() {
     let body = String::from("name=fastbyte%20bit&email=fast@byte.bit");
     test_app.post_subscriptions(body).await;
 
-    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions",)
+    let saved = sqlx::query!("SELECT name, email, status FROM subscriptions")
         .fetch_one(&test_app.db_pool)
         .await
         .expect("Failed to fetch one record from DB");
